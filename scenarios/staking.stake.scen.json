@@ -1,0 +1,47 @@
+{
+  "name": "staking.stake",
+  "steps": [
+    {
+      "step": "setState",
+      "accounts": {
+        "address:owner": {
+          "nonce": "1",
+          "balance": "1000000"
+        },
+        "sc:staking": {
+          "nonce": "0",
+          "balance": "50000000",
+          "storage": {
+            "1": "300000",
+            "2": "0",
+            "3": "0"
+          },
+          "code": "file:../output/staking.wasm"
+        }
+      },
+      "newAddresses": [
+        {
+          "creatorAddress": "address:owner",
+          "creatorNonce": "1",
+          "newAddress": "sc:staking"
+        }
+      ]
+    },
+    {
+      "step": "scCall",
+      "txId": "stake",
+      "tx": {
+        "from": "address:owner",
+        "to": "sc:staking",
+        "value": "1000000",
+        "function": "stake",
+        "arguments": [],
+        "gasLimit": "80000000",
+        "gasPrice": "0"
+      },
+      "expect": {
+        "status": "0"
+      }
+    }
+  ]
+}
