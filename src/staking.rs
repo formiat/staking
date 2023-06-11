@@ -6,6 +6,7 @@ multiversx_sc::imports!();
 pub trait StakingContract {
     #[init]
     fn init(&self) {
+        self.set_global_reward_share(&BigUint::zero());
         // Setting the reward speed at 0.0003 EGLD per second
         self.set_global_reward_speed(&BigUint::from(300000_u128));
         // Initializing the total stake and the last block
@@ -78,20 +79,29 @@ pub trait StakingContract {
 
         let global_rewards_per_block =
             self.get_global_reward_speed().unwrap_or_else(BigUint::zero) * delta_time;
-
-        let current_stake = self.get_stake(address).unwrap_or_else(BigUint::zero);
         let total_stake = self.get_total_stake().unwrap_or_else(BigUint::zero);
 
-        let user_rewards = if total_stake != BigUint::zero() {
-            &global_rewards_per_block * &current_stake / &total_stake
+        // Update the global reward share
+        let additional_share = if total_stake != BigUint::zero() {
+            global_rewards_per_block / total_stake
         } else {
             BigUint::zero()
         };
+        let global_reward_share = self.get_global_reward_share().unwrap_or_else(BigUint::zero);
+        let new_global_reward_share = &global_reward_share + &additional_share;
+        self.set_global_reward_share(&new_global_reward_share);
 
+        // Update the user's rewards
+        let current_stake = self.get_stake(address).unwrap_or_else(BigUint::zero);
+        let last_reward_share = self
+            .get_last_reward_share(address)
+            .unwrap_or_else(BigUint::zero);
+        let user_rewards = (&new_global_reward_share - &last_reward_share) * &current_stake;
         let current_rewards = self.get_rewards(address).unwrap_or_else(BigUint::zero);
         let new_rewards = &current_rewards + &user_rewards;
-
         self.set_rewards(address, &new_rewards);
+
+        self.set_last_reward_share(address, &new_global_reward_share);
         self.set_last_block(current_block);
     }
 
@@ -135,6 +145,20 @@ pub trait StakingContract {
     // #[storage_get("lastBlock")]
     #[storage_set("3")]
     fn set_last_block(&self, block: u64);
+
+    #[view(getGlobalRewardShare)]
+    #[storage_get("globalRewardShare")]
+    fn get_global_reward_share(&self) -> Option<BigUint>;
+
+    #[storage_set("globalRewardShare")]
+    fn set_global_reward_share(&self, share: &BigUint);
+
+    #[view(getLastRewardShare)]
+    #[storage_get("lastRewardShare")]
+    fn get_last_reward_share(&self, address: &ManagedAddress) -> Option<BigUint>;
+
+    #[storage_set("lastRewardShare")]
+    fn set_last_reward_share(&self, address: &ManagedAddress, share: &BigUint);
 
     fn direct_egld(&self, to: &ManagedAddress, amount: &BigUint, endpoint_name: &[u8]) {
         let token = &EgldOrEsdtTokenIdentifier::egld();
